@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tris</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: rgb(50, 50, 50);
+            color: rgb(220, 220, 220);
+        }
+        .game-container {
+            text-align: center;
+            background-color: rgb(60, 60, 60);
+            padding: 1rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 400px;
+        }
+        h1 {
+            margin-bottom: 1rem;
+            color: rgb(220, 220, 220);
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 10px;
+            margin-bottom: 1rem;
+        }
+        .cell {
+            aspect-ratio: 1 / 1;
+            background-color: rgb(70, 70, 70);
+            border: none;
+            border-radius: 10px;
+            font-size: 10vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: rgb(220, 220, 220);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            font-weight: 700;
+        }
+        .cell:hover:empty {
+            background-color: rgb(80, 80, 80);
+            transform: translateY(-2px);
+        }
+        #status {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+            color: rgb(180, 180, 180);
+        }
+        #reset {
+            font-size: 1rem;
+            padding: 0.8rem 1.5rem;
+            cursor: pointer;
+            background-color: rgb(100, 100, 100);
+            color: rgb(220, 220, 220);
+            border: none;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+        #reset:hover {
+            background-color: rgb(120, 120, 120);
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 480px) {
+            .game-container {
+                padding: 0.5rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+                margin-bottom: 0.5rem;
+            }
+            .board {
+                grid-gap: 5px;
+            }
+            .cell {
+                font-size: 16vw;
+            }
+            #status {
+                font-size: 1rem;
+            }
+            #reset {
+                font-size: 0.9rem;
+                padding: 0.6rem 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Battimi</h1>
+        <div id="status">Il tuo turno</div>
+        <div class="board" id="board">
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
+        </div>
+        <button id="reset">Ricomincia</button>
+    </div>
+
+    <script>
+        const board = document.getElementById('board');
+        const cells = document.querySelectorAll('.cell');
+        const status = document.getElementById('status');
+        const resetButton = document.getElementById('reset');
+        let currentPlayer = 'X';
+        let gameState = ['', '', '', '', '', '', '', '', ''];
+        let gameActive = true;
+        let isPlayerTurn = true;
+        const aiPlayer = 'O';
+        const humanPlayer = 'X';
+
+        const winningConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // righe
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // colonne
+            [0, 4, 8], [2, 4, 6] // diagonali
+        ];
+
+        function handleCellClick(e) {
+            if (!isPlayerTurn || !gameActive) return;
+
+            const clickedCell = e.target;
+            const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
+
+            if (gameState[clickedCellIndex] !== '') return;
+
+            gameState[clickedCellIndex] = humanPlayer;
+            clickedCell.textContent = humanPlayer;
+            clickedCell.style.cursor = 'default'; // Cambia il cursore dopo il click
+
+            checkResult();
+
+            if (gameActive) {
+                isPlayerTurn = false;
+                status.textContent = 'Turno del computer';
+                setTimeout(aiMove, 500);
+            }
+        }
+
+        function aiMove() {
+            let bestMove = -1;
+            
+            // Controlla se il bot può vincere con la prossima mossa
+            bestMove = findWinningMove(aiPlayer);
+            if (bestMove !== -1) {
+                makeMove(bestMove);
+                return;
+            }
+            
+            // Blocca la mossa vincente del giocatore
+            bestMove = findWinningMove(humanPlayer);
+            if (bestMove !== -1) {
+                makeMove(bestMove);
+                return;
+            }
+            
+            // Prendi il centro se è libero
+            if (gameState[4] === '') {
+                makeMove(4);
+                return;
+            }
+            
+            // Prendi un angolo libero
+            const corners = [0, 2, 6, 8];
+            const freeCorners = corners.filter(corner => gameState[corner] === '');
+            if (freeCorners.length > 0) {
+                const randomCorner = freeCorners[Math.floor(Math.random() * freeCorners.length)];
+                makeMove(randomCorner);
+                return;
+            }
+            
+            // Prendi un lato libero
+            const sides = [1, 3, 5, 7];
+            const freeSides = sides.filter(side => gameState[side] === '');
+            if (freeSides.length > 0) {
+                const randomSide = freeSides[Math.floor(Math.random() * freeSides.length)];
+                makeMove(randomSide);
+                return;
+            }
+        }
+
+        function findWinningMove(player) {
+            for (let i = 0; i < gameState.length; i++) {
+                if (gameState[i] === '') {
+                    gameState[i] = player;
+                    if (checkWinner(player)) {
+                        gameState[i] = '';
+                        return i;
+                    }
+                    gameState[i] = '';
+                }
+            }
+            return -1;
+        }
+
+        function checkWinner(player) {
+            for (let condition of winningConditions) {
+                if (condition.every(index => gameState[index] === player)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function makeMove(index) {
+            gameState[index] = aiPlayer;
+            cells[index].textContent = aiPlayer;
+            cells[index].style.cursor = 'default';
+            checkResult();
+            if (gameActive) {
+                isPlayerTurn = true;
+                status.textContent = 'Il tuo turno';
+            }
+        }
+
+        function checkResult() {
+            let roundWon = false;
+            for (let i = 0; i < winningConditions.length; i++) {
+                const [a, b, c] = winningConditions[i];
+                if (gameState[a] && gameState[a] === gameState[b] && gameState[a] === gameState[c]) {
+                    roundWon = true;
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                status.textContent = `${currentPlayer === humanPlayer ? 'Hai vinto!' : 'Il computer ha vinto!'}`;
+                gameActive = false;
+                return;
+            }
+
+            if (!gameState.includes('')) {
+                status.textContent = 'Pareggio!';
+                gameActive = false;
+                return;
+            }
+
+            currentPlayer = currentPlayer === humanPlayer ? aiPlayer : humanPlayer;
+            status.textContent = currentPlayer === humanPlayer ? 'Il tuo turno' : 'Turno del computer';
+        }
+
+        function resetGame() {
+            currentPlayer = humanPlayer;
+            gameState = ['', '', '', '', '', '', '', '', ''];
+            gameActive = true;
+            isPlayerTurn = true;
+            status.textContent = 'Il tuo turno';
+            cells.forEach(cell => {
+                cell.textContent = '';
+                cell.style.cursor = 'pointer'; // Ripristina il cursore pointer
+            });
+        }
+
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+        resetButton.addEventListener('click', resetGame);
+    </script>
+</body>
+</html>
